@@ -35,9 +35,9 @@ export default function createPersistoid(config: PersistConfig): Persistoid {
 
   const update = (state: Object) => {
     // add any changed keys to the queue
-    Object.keys(state).forEach(key => {
+    state.forEach((value, key) => {
       if (!passWhitelistBlacklist(key)) return // is keyspace ignored? noop
-      if (lastState[key] === state[key]) return // value unchanged? noop
+      if (lastState[key] === value) return // value unchanged? noop
       if (keysToProcess.indexOf(key) !== -1) return // is key already queued? noop
       keysToProcess.push(key) // add key to queue
     })
@@ -46,7 +46,7 @@ export default function createPersistoid(config: PersistConfig): Persistoid {
     //add it for processing too
     Object.keys(lastState).forEach(key => {
       if (
-        state[key] === undefined &&
+        state.get(key) === undefined &&
         passWhitelistBlacklist(key) &&
         keysToProcess.indexOf(key) === -1
       ) {
@@ -59,7 +59,7 @@ export default function createPersistoid(config: PersistConfig): Persistoid {
       timeIterator = setInterval(processNextKey, throttle)
     }
 
-    lastState = state
+    lastState = state.toJS()
   }
 
   function processNextKey() {

@@ -55,7 +55,7 @@ export default function persistReducer<State: Object, Action: Object>(
   let _paused = true
   const conditionalUpdate = state => {
     // update the persistoid only if we are rehydrated and not paused
-    state._persist.rehydrated &&
+    state.get('_persist').rehydrated &&
       _persistoid &&
       !_paused &&
       _persistoid.update(state)
@@ -63,7 +63,8 @@ export default function persistReducer<State: Object, Action: Object>(
   }
 
   return (state: State, action: Action) => {
-    let { _persist, ...rest } = state || {}
+    let _persist = state.get('_persist')
+    let rest = state.delete('_persist')
     let restState: State = rest
 
     if (action.type === PERSIST) {
@@ -135,32 +136,28 @@ export default function persistReducer<State: Object, Action: Object>(
         }
       )
 
-      return {
-        ...baseReducer(restState, action),
+      return baseReducer(restState, action).merge({
         _persist: { version, rehydrated: false },
-      }
+      })
     } else if (action.type === PURGE) {
       _purge = true
       action.result(purgeStoredState(config))
-      return {
-        ...baseReducer(restState, action),
+      return baseReducer(restState, action).merge({
         _persist,
-      }
+      })
     } else if (action.type === FLUSH) {
       action.result(_persistoid && _persistoid.flush())
-      return {
-        ...baseReducer(restState, action),
+      return baseReducer(restState, action).merge({
         _persist,
-      }
+      })
     } else if (action.type === PAUSE) {
       _paused = true
     } else if (action.type === REHYDRATE) {
       // noop on restState if purging
       if (_purge)
-        return {
-          ...restState,
+        return restState.merge({
           _persist: { ..._persist, rehydrated: true },
-        }
+        })
 
       // @NOTE if key does not match, will continue to default else below
       if (action.key === config.key) {
@@ -172,10 +169,9 @@ export default function persistReducer<State: Object, Action: Object>(
             ? stateReconciler(inboundState, state, reducedState, config)
             : reducedState
 
-        let newState = {
-          ...reconciledRest,
+        let newState = reconciledRest.merge({
           _persist: { ..._persist, rehydrated: true },
-        }
+        })
         return conditionalUpdate(newState)
       }
     }
@@ -187,6 +183,6 @@ export default function persistReducer<State: Object, Action: Object>(
     // is state modified ? return original : return updated
     let newState = baseReducer(restState, action)
     if (newState === restState) return state
-    return conditionalUpdate({ ...newState, _persist })
+    return conditionalUpdate(newState.merge({ _persist }))
   }
 }
